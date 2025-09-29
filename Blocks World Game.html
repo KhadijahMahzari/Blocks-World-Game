@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Blocks World - Simple HTML Game</title>
+  <style>
+    body{font-family:system-ui,-apple-system,Segoe UI,Roboto,'Helvetica Neue',Arial;margin:18px;background:#f8fafc}
+    h1{font-size:22px;margin-bottom:8px}
+    .board{display:flex;gap:28px;align-items:flex-end}
+    .slot{width:120px;min-height:140px;border:3px solid #d6e0ec;border-radius:6px;background:#fff;padding:8px;display:flex;flex-direction:column-reverse;align-items:center;justify-content:flex-start; cursor:pointer;}
+    .table{display:flex;gap:18px;margin-top:14px}
+    .block{width:88px;height:44px;border-radius:6px;border:2px solid #333;display:flex;align-items:center;justify-content:center;cursor:pointer;user-select:none;font-weight:700;font-size:18px;}
+    .holding-area{min-height:60px;border:2px dashed #cbd5e1;padding:8px;display:flex;align-items:center;gap:8px}
+    .log{margin-top:12px;background:#ffffff;padding:10px;border-radius:6px;border:1px solid #e2e8f0;max-height:220px;overflow:auto}
+    .btn{padding:6px 10px;border-radius:6px;border:none;background:#cca3ce;color:#fff;cursor:pointer}
+    .info{margin-top:8px;color:#475569}
+  </style>
+</head>
+<body>
+  <h1>Blocks World — Click to move </h1>
+  <div style="margin-bottom:12px;color:#694769">Initial state: A on C, C on table, B on table. Click blocks to pick them up and click slots to place them down. Only top blocks can be picked up. Logs show actions taken.</div>
+  <div style="display:flex;gap:28px;align-items:flex-start">
+    <div style="width:420px">
+      <div class="board">
+        <div class="slot" id="slot-1" data-slot="0"></div>
+        <div class="slot" id="slot-2" data-slot="1"></div>
+        <div class="slot" id="slot-3" data-slot="2"></div>
+      </div>
+
+      <div class="table" style="margin-top:12px">
+        <div style="flex:1;">
+          <div style="font-weight:600;margin-bottom:6px">Holding</div>
+          <div class="holding-area" id="holding"></div>
+        </div>
+        <div style="width:140px;text-align:right">
+          <div style="font-weight:600;margin-bottom:6px">Controls</div>
+          <button class="btn" id="reset">Reset</button>
+        </div>
+      </div>
+    </div>
+
+    <div style="width:420px">
+      <div style="font-weight:700;margin-bottom:6px">Log (actions will appear here)</div>
+      <div class="log" id="log"></div>
+
+      <div style="margin-top:12px">
+        <strong>Legend</strong>
+        <div style="margin-top:6px;color:#475569">Top block = clickable (pick only top blocks). Click on a slot (empty table position) to place on table or on top of a block. Logs include <code>handEmpty</code> and <code>clear(X)</code>.</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Initial state: A on C, C on table, B on table
+    let stacks = [['C','A'], ['B'], []];
+    let holding = null;
+
+    const logEl = document.getElementById('log');
+    const holdingEl = document.getElementById('holding');
+
+    function makeBlockEl(letter){
+      const el = document.createElement('div');
+      el.className = 'block';
+      el.dataset.block = letter;
+      el.textContent = letter;
+
+      // Assign color
+      if(letter==='A') el.style.background='#A376A2'; // red
+      if(letter==='B') el.style.background='#A7AAE1'; // blue
+      if(letter==='C') el.style.background='#D9E9CF'; // green
+
+      el.addEventListener('click',(e)=>{ e.stopPropagation(); onClickBlock(letter); });
+      return el;
+    }
+
+    function topOfStack(idx){ return stacks[idx].length ? stacks[idx][stacks[idx].length-1] : null; }
+
+    function findBlock(letter){
+      for(let i=0;i<stacks.length;i++){
+        const idx = stacks[i].indexOf(letter);
+        if(idx!==-1) return {slot:i,position:idx};
+      }
+      return null;
+    }
+
+    function log(msg){
+      const line = document.createElement('div');
+      line.textContent=msg;
+      logEl.appendChild(line);
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function render(){
+      // Render slots
+      for(let i=0;i<3;i++){
+        const slot = document.getElementById('slot-'+(i+1));
+        slot.innerHTML='';
+        for(let b of stacks[i]){
+          slot.appendChild(makeBlockEl(b));
+        }
+        slot.onclick = ()=>onClickSlot(i);
+      }
+
+      // Render holding
+      holdingEl.innerHTML='';
+      if(holding) holdingEl.appendChild(makeBlockEl(holding));
+      else log('handEmpty');
+
+      // Log clear blocks
+      for(let i=0;i<stacks.length;i++){
+        const top=topOfStack(i);
+        if(top) log(`clear(${top})`);
+      }
+    }
+
+    function onClickBlock(letter){
+      const loc = findBlock(letter);
+      if(!loc){ log(`Block ${letter} not found`); return; }
+
+      if(holding){
+        if(topOfStack(loc.slot)!==letter){ log(`Cannot put on ${letter}: it's not top`); return; }
+        stacks[loc.slot].push(holding);
+        log(`on(${holding},${letter})`);
+        holding=null;
+        render();
+        return;
+      }
+
+      if(topOfStack(loc.slot)!==letter){ log(`Cannot pick ${letter}, it has something on it.`); return; }
+      stacks[loc.slot].pop();
+      holding=letter;
+      log(`holding(${letter})`);
+      render();
+    }
+
+    function onClickSlot(slotIdx){
+      if(!holding){ log('handEmpty'); return; }
+      const top = topOfStack(slotIdx);
+      if(top){ stacks[slotIdx].push(holding); log(`on(${holding},${top})`); }
+      else{ stacks[slotIdx].push(holding); log(`ontable(${holding})`); }
+      holding=null;
+      render();
+    }
+
+    document.getElementById('reset').onclick = ()=>{
+      stacks = [['C','A'], ['B'], []];
+      holding=null;
+      logEl.innerHTML='';
+      log('Start: A on C, C on table, B on table');
+      render();
+    }
+
+    log('Start: A on C, C on table, B on table');
+    render();
+  </script>
+</body>
+</html>
